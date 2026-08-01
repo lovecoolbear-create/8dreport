@@ -571,40 +571,41 @@
     </tr>
   </table>
 
-  <h3>4.2 交付路线图（修订版）</h3>
+  <h3>4.2 工程落地五步走路线图</h3>
 
-  <h4>Phase 1: MVP 快速验证 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 3-4 周</span></h4>
+  <h4>Phase 1: 搭建核心 LLM 引擎 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">推荐架构：Python + FastAPI</span></h4>
   <ul>
-    <li>在 Dify 上编排分步确认工作流 + 双库 RAG 逻辑</li>
-    <li>实现图片+邮件的多模态解析（视频不做）</li>
-    <li>实现证据链绑定输出 + 置信度三级标注 + 补充资料清单自动触发</li>
-    <li>实现责任判定确认框（AI 建议 + 人工确认）</li>
-    <li>用 Streamlit 搭建三栏 Web 界面，完成内部测试</li>
+    <li>初始化后端工程，搭建标准 FastAPI 项目结构</li>
+    <li>定义 Pydantic 数据模型，严格映射 8D Report Schema V2</li>
+    <li>实现 LLM 调用层（封装 OpenAI/Anthropic），注入 Jinja2 渲染的 Prompt，支持 Structured Output</li>
   </ul>
 
-  <h4>Phase 2: 数据流水线与冷启动 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 2-3 周</span></h4>
+  <h4>Phase 2: 最小可行性测试流 (Mock 测试) <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">纯代码黑盒验证</span></h4>
   <ul>
-    <li>盘点历史 8D 报告格式，评估 ETL 工作量</li>
-    <li>开发 LLM-as-ETL 自动化清洗脚本（分段提取 → JSON Schema 校验 → 向量化入库）</li>
-    <li>整理并预置包装行业公共标准知识库（GB/ISO/TAPPI，约 20~50 份核心文档）</li>
-    <li>实现报告 PDF/Word 一键导出功能</li>
+    <li>编写 <code>test_pipeline.py</code> 测试脚本</li>
+    <li>模拟客诉邮件和假想 RAG 数据，跑通 5W2H -> 5-Why -> 责任判定的连贯推理</li>
+    <li>验证 AI 回答的逻辑严密性与 JSON 结构一致性</li>
   </ul>
 
-  <h4>Phase 3: 多租户 SaaS 部署 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 2-3 个月</span></h4>
+  <h4>Phase 3: 搭建 RAG 向量检索与数据库 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">知识库接入</span></h4>
   <ul>
-    <li>采用 React/Vue 重构 B 端前端界面</li>
-    <li>增加用户认证与权限控制系统</li>
-    <li>实现多 Workspace 租户隔离（逻辑隔离 + 大客户独立部署可选）</li>
-    <li>增加操作审计日志（满足 ISO 体系审核要求）</li>
-    <li>评估 Dify 长期稳定性，预留自建编排层迁移路径</li>
+    <li>引入轻量级向量数据库（如 ChromaDB, Milvus 或 PostgreSQL+pgvector）</li>
+    <li>开发知识入库脚本，将包装行业标准（GB/ISO等）与历史客诉切割、向量化并入库</li>
+    <li>打通 Prompt B 中的 <code>rag_public_docs</code> 与 <code>rag_private_docs</code> 动态检索链路</li>
   </ul>
 
-  <h4>Phase 4: 扩展能力（按需） <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">持续迭代</span></h4>
+  <h4>Phase 4: 后端 API 化 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">服务封装</span></h4>
   <ul>
-    <li>视频关键帧分析（如工厂产线监控视频）</li>
-    <li>PDF 附件自动解析</li>
-    <li>与客户 ERP/QMS 系统的 API 对接</li>
-    <li>统计分析看板（客诉趋势、供应商质量评分等）</li>
+    <li>将本地测试流封装为 RESTful API（如 <code>/api/v1/report/step1/5w2h</code>）</li>
+    <li>实现前端调用参数处理与流式（Streaming）返回</li>
+    <li>维护报告生成过程中的中间状态（如 Step 1 确认后，才能调用 Step 2）</li>
+  </ul>
+
+  <h4>Phase 5: 构建前端控制台 UI <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">推荐架构：Next.js + Tailwind</span></h4>
+  <ul>
+    <li>可视化渲染 8D 处理步骤，支持用户核对、修改 AI 生成草稿</li>
+    <li>设计并实现“假设分支推演”的差异化渲染（虚线/不同颜色高亮，提示用户补充材料）</li>
+    <li>对接后端 API，完成从图片上传到生成完整 8D 报告的端到端交互</li>
   </ul>
 </section>
 

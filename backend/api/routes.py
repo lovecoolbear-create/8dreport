@@ -6,7 +6,7 @@ from models.schema import ProblemDescription5W2H
 from services.llm_service import LLMService
 
 router = APIRouter()
-llm_service = LLMService(model_name="gpt-4o-mini")
+llm_service = LLMService(model_name="ollama/qwen2.5:14b-instruct-q4_K_M")
 
 # --- Request / Response Models ---
 class Step1Request(BaseModel):

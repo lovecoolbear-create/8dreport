@@ -8,7 +8,7 @@ from models.schema import ProblemDescription5W2H
 PROMPT_DIR = Path(__file__).parent.parent / "prompts"
 
 class LLMService:
-    def __init__(self, model_name: str = "gpt-4o-mini"):
+    def __init__(self, model_name: str = "ollama/qwen2.5:14b-instruct-q4_K_M"):
         self.model_name = model_name
 
     def load_component(self, name: str) -> str:

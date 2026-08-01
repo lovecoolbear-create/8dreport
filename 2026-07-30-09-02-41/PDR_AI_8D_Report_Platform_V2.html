@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 多模态智能 8D 报告生成平台 — PDR V2.0</title>
+<style>
+  :root {
+    --primary: #1a56db;
+    --primary-light: #e8f0fe;
+    --text: #1f2937;
+    --text-secondary: #4b5563;
+    --bg: #ffffff;
+    --border: #e5e7eb;
+    --accent: #059669;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    line-height: 1.75;
+    background: #f9fafb;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+  
+  /* Header */
+  .cover {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 48px 40px;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .cover .badge {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+  .cover h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .cover .subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+  .cover .meta {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .cover .meta span { display: flex; align-items: center; gap: 6px; }
+  .version-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  /* Sections */
+  section {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    background: var(--primary);
+    color: #fff;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0 12px;
+    color: var(--primary);
+  }
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px;
+    color: var(--text);
+  }
+  p { margin-bottom: 12px; color: var(--text-secondary); }
+
+  /* Lists */
+  ul { margin: 8px 0 16px 20px; color: var(--text-secondary); }
+  li { margin-bottom: 6px; }
+  li strong { color: var(--text); }
+
+  /* Flow Chart */
+  .flow {
+    background: var(--primary-light);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 16px 0;
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 2;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* Callout boxes */
+  .callout {
+    border-left: 4px solid var(--primary);
+    background: var(--primary-light);
+    padding: 14px 18px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 16px 0;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .callout.warn {
+    border-left-color: var(--warn);
+    background: #fef3c7;
+  }
+  .callout.success {
+    border-left-color: var(--accent);
+    background: #ecfdf5;
+  }
+
+  /* Confirmation Box Mockup */
+  .mockup-box {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin: 16px 0;
+    background: #fafbfc;
+    font-size: 13px;
+  }
+  .mockup-box .radio-group { margin: 10px 0; }
+  .mockup-box .radio-item {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: #fff;
+    cursor: default;
+  }
+  .mockup-box .radio-item.recommended {
+    border-color: var(--accent);
+    background: #ecfdf5;
+  }
+  .mockup-box .radio-item .label { font-weight: 600; }
+  .mockup-box .radio-item .evidence { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .mockup-box .actions { margin-top: 12px; display: flex; gap: 8px; }
+  .mockup-box .btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: default;
+  }
+  .mockup-box .btn.primary { background: var(--primary); color: #fff; }
+  .mockup-box .btn.secondary { background: #e5e7eb; color: var(--text); }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  td { color: var(--text-secondary); }
+  td:first-child { font-weight: 500; color: var(--text); }
+
+  /* Risk Matrix */
+  .risk-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .risk-tag.high { background: #fee2e2; color: var(--danger); }
+  .risk-tag.medium { background: #fef3c7; color: var(--warn); }
+  .risk-tag.low { background: #ecfdf5; color: var(--accent); }
+
+  /* Changelog */
+  .changelog li { margin-bottom: 10px; }
+  .changelog .v2 { color: var(--accent); font-weight: 600; }
+
+  /* Evidence format */
+  .code-block {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ===== COVER ===== -->
+<div class="cover">
+  <div class="badge">产品定义记录 PDR</div>
+  <h1>AI 多模态智能 8D 报告生成平台</h1>
+  <div class="subtitle">AI-Driven 8D Report Copilot — 包装与制造供应链专用</div>
+  <div class="meta">
+    <span>📄 版本 <span class="version-tag">V2.0</span></span>
+    <span>📅 2026年07月30日</span>
+    <span>📌 修订版（基于 V1.0 讨论优化）</span>
+  </div>
+</div>
+
+<!-- ===== CHANGELOG ===== -->
+<section>
+  <h2><span class="num">0</span> V2.0 修订说明</h2>
+  <ul class="changelog">
+    <li><span class="v2">[策略调整 1]</span> 多模态输入聚焦图片+邮件解析，视频分析暂缓至 Phase 2+，降低 MVP 成本和复杂度。</li>
+    <li><span class="v2">[策略调整 2]</span> 历史 8D 报告结构化采用 <strong>LLM-as-ETL</strong> 方案：用便宜大模型（DeepSeek/Qwen）+ JSON Schema 自动提取，替代传统正则/NER 方案，增加 jsonschema 校验+重试防御层。</li>
+    <li><span class="v2">[策略调整 3]</span> 5-Why 根因推演增加三项硬约束：① 强制证据链绑定（每条推论必须引用来源）② 置信度三级标注（confirmed / inferred / speculative）③ 推测项自动触发补充资料清单。</li>
+    <li><span class="v2">[策略调整 4]</span> 责任判定改为 <strong>AI 建议 + 单选确认框 + 人工决策</strong> 模式，AI 不越权。</li>
+    <li><span class="v2">[策略调整 5]</span> 工作流从"两步法"升级为 <strong>分步确认工作流</strong>，每步确认后数据才流入下一步，避免连锁返工。</li>
+    <li><span class="v2">[时间线修正]</span> 基于实际开发复杂度，Phase 1 调整为 3-4 周，Phase 3 调整为 2-3 个月。</li>
+  </ul>
+</section>
+
+<!-- ===== 1 ===== -->
+<section>
+  <h2><span class="num">1</span> 项目背景与目标</h2>
+  
+  <h3>1.1 业务痛点</h3>
+  <ul>
+    <li><strong>效率低下：</strong>传统客诉处理与 8D 报告撰写过程漫长，信息散落在邮件、图片及各类检测报告中，整理与推演归因耗时耗力。</li>
+    <li><strong>质量参差不齐：</strong>团队成员经验差异大，初级 QA 难以精准判断根本原因与责任方，容易导致责任推诿或措施不到位。</li>
+    <li><strong>经验无法沉淀：</strong>历史优秀 8D 案例与行业标准未有效转化为生产力，新接手项目或新公司需要重复踩坑。</li>
+  </ul>
+
+  <h3>1.2 产品目标</h3>
+  <p>打造一款专为包装与制造供应链打造的 <strong>AI 智能 8D 报告协作平台</strong>，核心理念是"AI 做助手，人做决策"：</p>
+  <ol style="margin-left:20px; color:var(--text-secondary);">
+    <li style="margin-bottom:8px;"><strong>输入阶段：</strong>自动解析邮件正文、附件图片中的关键信息，输出 5W2H 摘要与精准的"补充资料清单"。</li>
+    <li style="margin-bottom:8px;"><strong>推演阶段：</strong>结合补充资料，进行证据链绑定的 5-Why 根因推演，每条推论标注置信度与来源。</li>
+    <li style="margin-bottom:8px;"><strong>判定阶段：</strong>AI 给出责任归属建议，由工程师通过确认框做最终决策。</li>
+    <li style="margin-bottom:8px;"><strong>生成阶段：</strong>确认后自动填充 D1~D8 标准卡片，支持逐卡编辑与局部 AI 重生成。</li>
+    <li><strong>部署扩展：</strong>支持多租户隔离与双层知识库，可无缝赋能不同客户与新公司。</li>
+  </ol>
+</section>
+
+<!-- ===== 2 ===== -->
+<section>
+  <h2><span class="num">2</span> 目标用户与使用场景</h2>
+  
+  <h3>2.1 核心用户</h3>
+  <p>质量工程师 (QE/QA)、供应链/采购经理、客服质量主管、工厂技术人员。</p>
+
+  <h3>2.2 典型场景</h3>
+  <table>
+    <tr><th style="width:100px">场景</th><th>触发条件</th><th>系统行为</th></tr>
+    <tr>
+      <td>A. 初始接案</td>
+      <td>收到客户抱怨邮件与现场照片</td>
+      <td>解析邮件+图片 → 输出 5W2H 摘要 → 给出补充资料调取建议</td>
+    </tr>
+    <tr>
+      <td>B. 根因推演</td>
+      <td>补充数据到位（COA检测、物流记录等）</td>
+      <td>5-Why 证据链推演 → 置信度标注 → 推测项触发二次补充请求</td>
+    </tr>
+    <tr>
+      <td>C. 责任判定</td>
+      <td>证据链完整</td>
+      <td>AI 建议责任归属 → 工程师确认框确认 → 锁定结论</td>
+    </tr>
+    <tr>
+      <td>D. 报告结案</td>
+      <td>所有 D1~D8 确认完毕</td>
+      <td>一键导出标准格式 PDF/Word 8D 报告，提交客户或归档</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ===== 3 ===== -->
+<section>
+  <h2><span class="num">3</span> 系统核心功能规格</h2>
+
+  <h3>3.1 分步确认工作流（Step-by-Step Confirmation Workflow）</h3>
+  <p>区别于传统"扔资料→出报告"的黑盒模式，系统采用 <strong>分步交互</strong>，每步产出需人工确认后才流入下一步：</p>
+
+  <div class="flow">
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: 初分析与资料调取                                      │
+│  邮件/图片 ──► 多模态解析 ──► 输出 5W2H 摘要 + 补充资料清单      │
+│                                        │                     │
+│                                   [用户确认/修改/补充上传]       │
+├─────────────────────────────────────────────────────────────┤
+│  Step 2: 根因推演（证据链绑定）                                  │
+│  补充资料 ──► 5-Why 推演 ──► 输出每条推论的依据+置信度           │
+│                                        │                     │
+│                                   [用户确认根因/修正推理]        │
+├─────────────────────────────────────────────────────────────┤
+│  Step 3: 责任判定                                              │
+│  已确认根因 ──► AI 责任建议 ──► 单选确认框                      │
+│                                        │                     │
+│                                   [工程师做最终决策]            │
+├─────────────────────────────────────────────────────────────┤
+│  Step 4: 8D 卡片渲染                                           │
+│  责任锁定 ──► 逐卡生成 D1~D8 ──► 每卡可编辑 + 局部AI重生成      │
+│                                        │                     │
+│                                   [逐卡审核 → 一键导出]         │
+└─────────────────────────────────────────────────────────────┘
+  </div>
+
+  <div class="callout success">
+    <strong>设计意图：</strong>分步确认天然创建了工作流的 check point。如果某一步资料不足或证据链断裂，用户在该步即可停下补充，不会浪费时间去确认后续步骤。体验上类似"有个经验丰富的 QA 在旁边跟你一起过案子"。
+  </div>
+
+  <h3>3.2 多模态输入解析（图片 + 邮件）</h3>
+  <ul>
+    <li><strong>邮件解析：</strong>支持粘贴邮件正文或拖入 .eml 文件，系统自动提取发件人、时间、正文内容及附件图片。</li>
+    <li><strong>图片分析：</strong>利用视觉大模型（Vision LLM）对上传的现场照片进行缺陷特征识别，包括但不限于：破损、划痕、塌箱、变形、印刷缺陷、受潮痕迹等。</li>
+    <li><strong>视频分析（暂缓）：</strong>视频解析涉及逐帧调用 Vision API，成本高且包装行业视频素材使用率低。Phase 1 不做，后续按需评估。</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>Phase 1 范围收敛：</strong>首版仅支持图片（JPG/PNG）+ 邮件文本（粘贴/eml）。PDF 附件暂通过用户手动粘贴关键段落的方式处理，自动化 PDF 解析列入 Phase 2。
+  </div>
+
+  <h3>3.3 双层知识库（RAG）+ LLM-as-ETL</h3>
+
+  <h4>第一层：公共行业知识库（Public Know-How Base）</h4>
+  <ul>
+    <li><strong>内容：</strong>预置包装/制造行业国家标准（GB/ISO/TAPPI）、通用 8D 规范、典型缺陷分析图谱。</li>
+    <li><strong>作用：</strong>确保系统即插即用，新公司即使零私有数据也能输出专业级分析。</li>
+    <li><strong>冷启动策略：</strong>由项目组一次性整理核心标准文档（约 20~50 份），通过标准 RAG 流水线向量化入库。</li>
+  </ul>
+
+  <h4>第二层：企业私有数据库（Private Tenant Base）</h4>
+  <ul>
+    <li><strong>内容：</strong>特定客户的历史 8D 报告、内部 SOP、产品规格书、供应商名册。</li>
+    <li><strong>隔离：</strong>通过 tenant_id 元数据标签实现多租户逻辑隔离（大客户可独立部署）。</li>
+    <li><strong>进化：</strong>每完成一份新 8D 报告，自动追加到私有库，随使用时间自我增强。</li>
+  </ul>
+
+  <h4>LLM-as-ETL：历史报告结构化管线</h4>
+  <p>历史 8D 报告格式各异（Word/PDF/扫描件），传统正则方案维护成本高。采用 <strong>便宜大模型 + JSON Schema</strong> 方案：</p>
+
+  <div class="flow">
+历史8D报告 → 按D1~D8章节分段 → 便宜模型提取(DeepSeek/Qwen) → JSON Schema校验
+                                                         │
+                                          ┌──────────────┴──────────────┐
+                                          │ 校验通过 → 向量化入库        │
+                                          │ 校验失败 → 错误信息回传模型重试  │
+                                          └─────────────────────────────┘
+  </div>
+
+  <div class="callout">
+    <strong>防御性设计要点：</strong>
+    <br>① JSON Schema 严格校验，字段不合规自动重试（最多 3 次）
+    <br>② 长报告按 D1~D8 章节分段提取，避免上下文过长导致精度下降
+    <br>③ 模型选择：DeepSeek-V3 或 Qwen3-235B（中文好+便宜，性价比优于 GPT-4o-mini）
+  </div>
+
+  <h3>3.4 5-Why 根因推演（证据链绑定 + 置信度分级）</h3>
+
+  <p>这是系统的核心推理引擎，采用 <strong>三条硬约束</strong> 确保输出可靠：</p>
+
+  <h4>约束一：强制证据链绑定</h4>
+  <p>每条推论必须附带引用来源，不允许凭空断言。输出格式：</p>
+
+  <div class="code-block">
+{
+  "claim": "纸箱塌箱的根本原因为边压强度不达标",
+  "why_chain": [
+    {
+      "level": 1,
+      "question": "为什么纸箱会塌？",
+      "answer": "纸箱底部承压能力不足",
+      "evidence": [
+        { "source": "COA检测报告_批次20260715.pdf 第3页", "excerpt": "边压强度实测值 3.2 kN/m，标准要求 ≥ 4.5 kN/m" },
+        { "source": "现场照片_DSC002.jpg", "description": "纸箱底部明显变形，呈现对称塌陷特征" }
+      ]
+    }
+    // ... 更多层级
+  ],
+  "root_cause": "供应商该批次纸板边压强度不达标",
+  "confidence": "confirmed"
+}
+  </div>
+
+  <h4>约束二：置信度三级标注</h4>
+  <table>
+    <tr><th>级别</th><th>含义</th><th>触发行为</th></tr>
+    <tr>
+      <td><span class="risk-tag low">confirmed</span></td>
+      <td>有直接证据支持</td>
+      <td>正常推进下一步</td>
+    </tr>
+    <tr>
+      <td><span class="risk-tag medium">inferred</span></td>
+      <td>多条证据组合推理得出，逻辑自洽但无直接证明</td>
+      <td>标注推理路径，建议人工复核</td>
+    </tr>
+    <tr>
+      <td><span class="risk-tag high">speculative</span></td>
+      <td>无直接或间接证据，属于 AI 推测</td>
+      <td><strong>禁止作为结论使用</strong>，自动触发补充资料清单</td>
+    </tr>
+  </table>
+
+  <h4>约束三：推测自动触发补充资料清单</h4>
+  <p>当某条推论置信度为 <code>speculative</code> 时，系统不输出结论，而是生成针对性的补充资料请求，例：</p>
+  <div class="callout warn">
+    ⚠️ 以下推论证据不足（speculative），暂不纳入结论：<br>
+    "纸箱受潮可能是物流途中淋雨导致"<br>
+    → 请补充：① 物流签收单（核对签收时包装状态） ② 运输期间沿途天气记录 ③ 仓库温湿度日志
+  </div>
+
+  <h3>3.5 责任判定确认框（AI 建议 + 人工决策）</h3>
+  <p>AI 仅给出建议，<strong>不做最终决策</strong>。工程师通过单选确认框选择或手动输入：</p>
+
+  <div class="mockup-box">
+    <div style="font-weight:700; font-size:14px; margin-bottom:2px;">🏭 责任判定（请确认或修改）</div>
+    <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">以下为 AI 基于证据链给出的建议，请做出最终判定</div>
+    
+    <div class="radio-group">
+      <div class="radio-item recommended">
+        <span class="label">◎ 供应商责任（AI 推荐）</span>
+        <div class="evidence">依据：COA 边压强度不达标（3 条证据）| 来料检验记录缺失（2 条证据）</div>
+      </div>
+      <div class="radio-item">
+        <span class="label">○ 客户方责任</span>
+        <div class="evidence">依据：无直接证据支持</div>
+      </div>
+      <div class="radio-item">
+        <span class="label">○ 设计缺陷</span>
+        <div class="evidence">依据：无直接证据支持</div>
+      </div>
+      <div class="radio-item">
+        <span class="label">○ 第三方（物流等）</span>
+        <div class="evidence">依据：物流温湿度记录异常（1 条证据）| 置信度：inferred</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <span class="btn primary">✓ 确认判定</span>
+      <span class="btn secondary">✎ 手动输入理由</span>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <strong>合规价值：</strong>AI 建议 + 人工确认的交互模式符合 ISO 9001 / IATF 16949 体系审核对"人做最终决策"的要求。确认操作记录可作为审计追踪日志保存。
+  </div>
+
+  <h3>3.6 8D 草案渲染与编辑</h3>
+  <p>责任归属确认后，系统自动填充 D1~D8 结构卡片，每张卡片支持：</p>
+  <ul>
+    <li><strong>直接编辑：</strong>点击卡片内任意文本区域直接修改</li>
+    <li><strong>局部 AI 重生成：</strong>单张卡片不满意可点击"AI 重新生成"按钮，仅刷新该卡片内容</li>
+    <li><strong>证据回链：</strong>卡片中每条关键结论旁标注来源引用，可点击查看原始资料</li>
+    <li><strong>一键导出：</strong>确认全部卡片后，导出为标准格式 PDF/Word 8D 报告</li>
+  </ul>
+
+  <h3>3.7 三栏界面设计（Three-Pane Workbench）</h3>
+  <table>
+    <tr><th style="width:80px">栏目</th><th style="width:120px">名称</th><th>核心功能</th></tr>
+    <tr>
+      <td>左栏</td>
+      <td>资料与空间管理</td>
+      <td>Workspace 下拉切换（租户/公司）、多模态客诉资料上传池（邮件文本粘贴、图片拖拽）、历史报告列表与状态跟踪、分步确认进度条</td>
+    </tr>
+    <tr>
+      <td>中栏</td>
+      <td>8D 标准文档画布</td>
+      <td>D1~D8 结构化卡片渲染、支持工程师直接在线编辑修改、单卡片"AI 局部重新生成"按钮、证据引用标注可点击溯源</td>
+    </tr>
+    <tr>
+      <td>右栏</td>
+      <td>AI 逻辑助手</td>
+      <td>可解释性面板（标注推导依据来源 + 置信度）、追问交互框（如"把 D3 围堵措施写得更具体些"）、责任判定确认框、补充资料清单管理</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <strong>交互设计原则：</strong>三栏布局参考 IDE 工作台模式——左侧资源管理、中间文档编辑、右侧辅助分析。每步确认的状态变化在左栏进度的度条和右栏的结论面板中同步体现。
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section>
+  <h2><span class="num">4</span> 技术栈与实施路径</h2>
+
+  <h3>4.1 技术选型</h3>
+  <table>
+    <tr><th style="width:140px">层级</th><th>技术方案</th><th>备注</th></tr>
+    <tr>
+      <td>前端 (MVP)</td>
+      <td>Python Streamlit</td>
+      <td>极速搭建三栏工作台原型，适合内部验证</td>
+    </tr>
+    <tr>
+      <td>前端 (正式版)</td>
+      <td>React 18 / Vue 3 + Tailwind CSS</td>
+      <td>高质感 B 端 SaaS 界面</td>
+    </tr>
+    <tr>
+      <td>后端编排</td>
+      <td>Dify (开源 AI 应用开发平台)</td>
+      <td>可视化编排工作流 + 双库检索 + 多模态 Prompt</td>
+    </tr>
+    <tr>
+      <td>大模型</td>
+      <td>GPT-4o / Claude 3.5 Sonnet（推理）<br>DeepSeek-V3 / Qwen3（ETL & 摘要）</td>
+      <td>分层使用：强推理模型做根因推演，便宜模型做批量 ETL</td>
+    </tr>
+    <tr>
+      <td>向量数据库</td>
+      <td>Qdrant / Milvus (首选) 或 Chroma (轻量)</td>
+      <td>支持 Metadata 租户隔离过滤 + Hybrid Search</td>
+    </tr>
+    <tr>
+      <td>报告导出</td>
+      <td>python-docx / WeasyPrint / Puppeteer</td>
+      <td>8D 标准模板渲染为 PDF/Word</td>
+    </tr>
+  </table>
+
+  <h3>4.2 交付路线图（修订版）</h3>
+
+  <h4>Phase 1: MVP 快速验证 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 3-4 周</span></h4>
+  <ul>
+    <li>在 Dify 上编排分步确认工作流 + 双库 RAG 逻辑</li>
+    <li>实现图片+邮件的多模态解析（视频不做）</li>
+    <li>实现证据链绑定输出 + 置信度三级标注 + 补充资料清单自动触发</li>
+    <li>实现责任判定确认框（AI 建议 + 人工确认）</li>
+    <li>用 Streamlit 搭建三栏 Web 界面，完成内部测试</li>
+  </ul>
+
+  <h4>Phase 2: 数据流水线与冷启动 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 2-3 周</span></h4>
+  <ul>
+    <li>盘点历史 8D 报告格式，评估 ETL 工作量</li>
+    <li>开发 LLM-as-ETL 自动化清洗脚本（分段提取 → JSON Schema 校验 → 向量化入库）</li>
+    <li>整理并预置包装行业公共标准知识库（GB/ISO/TAPPI，约 20~50 份核心文档）</li>
+    <li>实现报告 PDF/Word 一键导出功能</li>
+  </ul>
+
+  <h4>Phase 3: 多租户 SaaS 部署 <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">预计 2-3 个月</span></h4>
+  <ul>
+    <li>采用 React/Vue 重构 B 端前端界面</li>
+    <li>增加用户认证与权限控制系统</li>
+    <li>实现多 Workspace 租户隔离（逻辑隔离 + 大客户独立部署可选）</li>
+    <li>增加操作审计日志（满足 ISO 体系审核要求）</li>
+    <li>评估 Dify 长期稳定性，预留自建编排层迁移路径</li>
+  </ul>
+
+  <h4>Phase 4: 扩展能力（按需） <span style="color:var(--text-secondary); font-weight:400; font-size:13px;">持续迭代</span></h4>
+  <ul>
+    <li>视频关键帧分析（如工厂产线监控视频）</li>
+    <li>PDF 附件自动解析</li>
+    <li>与客户 ERP/QMS 系统的 API 对接</li>
+    <li>统计分析看板（客诉趋势、供应商质量评分等）</li>
+  </ul>
+</section>
+
+<!-- ===== 5 ===== -->
+<section>
+  <h2><span class="num">5</span> 关键风险与应对策略</h2>
+  <table>
+    <tr><th style="width:30px">#</th><th>风险</th><th style="width:60px">等级</th><th>应对策略</th></tr>
+    <tr>
+      <td>1</td>
+      <td><strong>幻觉与误判风险：</strong>LLM 在根因推演中编造因果链</td>
+      <td><span class="risk-tag high">高</span></td>
+      <td>强制证据链绑定 + 置信度三级标注 + speculative 项禁止作为结论 + Human-in-the-loop 确认机制</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>多模态识别准确率：</strong>包装缺陷图片分析不准确</td>
+      <td><span class="risk-tag medium">中</span></td>
+      <td>持续优化 Vision Prompt，建立缺陷特征对比库；初期对模糊/低质量图片主动提示用户补充拍摄</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>API 成本失控：</strong>多模态+推理调用累积成本高</td>
+      <td><span class="risk-tag medium">中</span></td>
+      <td>分层模型策略（强推理 vs 便宜 ETL 分开）；图片预处理压缩减分辨率；建立单案件成本上限告警</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>多租户数据安全：</strong>客户间数据隔离失效</td>
+      <td><span class="risk-tag high">高</span></td>
+      <td>检索层严格校验 tenant_id 元数据；大客户支持独立 Docker 部署；定期的隔离渗透测试</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Dify 平台依赖：</strong>Dify 更新/故障影响平台稳定性</td>
+      <td><span class="risk-tag medium">中</span></td>
+      <td>Phase 3 评估 Dify 独立部署方案的稳定性；核心 Prompt 和 RAG 逻辑与 Dify 解耦，预留迁移能力</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>历史报告 ETL 失败：</strong>LLM-as-ETL 输出不合规 JSON</td>
+      <td><span class="risk-tag low">低</span></td>
+      <td>jsonschema 校验 + 错误信息回传重试（最多 3 次）；最终兜底人工抽查</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><strong>用户接受度：</strong>工程师不信任 AI 建议，使用率低</td>
+      <td><span class="risk-tag medium">中</span></td>
+      <td>分步确认 + 证据链透明化建立信任；初期以 1-2 个品类做试点，用真实案例效果推动推广</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ===== 6 ===== -->
+<section>
+  <h2><span class="num">6</span> 成功指标（KPI）</h2>
+  <table>
+    <tr><th>指标</th><th>目标值</th><th>衡量方式</th></tr>
+    <tr>
+      <td>单案 8D 报告生成时间</td>
+      <td>从资料齐全到初稿 ≤ 5 分钟（含人工确认时间）</td>
+      <td>系统计时统计</td>
+    </tr>
+    <tr>
+      <td>AI 根因判定与人工一致率</td>
+      <td>≥ 75%（人工复核后无需修改根因判定）</td>
+      <td>抽样复核统计</td>
+    </tr>
+    <tr>
+      <td>报告人工修改率</td>
+      <td>每份报告人工修改 ≤ 30% 的卡片内容</td>
+      <td>编辑距离统计</td>
+    </tr>
+    <tr>
+      <td>用户 NPS</td>
+      <td>试点用户 NPS ≥ 30</td>
+      <td>季度 NPS 调研</td>
+    </tr>
+    <tr>
+      <td>补充资料清单准确率</td>
+      <td>≥ 80%（触发请求后确实为必要补充）</td>
+      <td>人工评估抽样</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ===== Footer ===== -->
+<div style="text-align:center; padding:24px; color:var(--text-secondary); font-size:13px;">
+  AI 多模态智能 8D 报告生成平台 · PDR V2.0 · 2026年07月30日<br>
+  V2.0 修订基于 V1.0 的技术可行性讨论，核心调整聚焦可落地性与 AI 边界控制
+</div>
+
+</div>
+</body>
+</html>

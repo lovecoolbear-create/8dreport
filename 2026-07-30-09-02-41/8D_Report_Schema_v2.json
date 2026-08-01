@@ -1,0 +1,1911 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ai8d.example.com/schemas/8d-report-v2.json",
+  "title": "8D Report — AI 多模态智能 8D 报告生成平台 统一数据结构",
+  "description": "所有模块（ETL、推理、渲染、导出）以此 Schema 为唯一数据契约。适用于 FastAPI/Pydantic 校验、Directus 模型生成、TypeScript 类型推导。",
+  "type": "object",
+  "required": [
+    "metadata",
+    "source_materials",
+    "D1_team",
+    "D2_problem_description",
+    "D3_containment",
+    "D4_root_cause",
+    "D5_corrective_actions",
+    "D6_verification",
+    "D7_preventive_actions",
+    "D8_recognition",
+    "audit_log"
+  ],
+  "definitions": {
+    "Evidence": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_type",
+        "source_name",
+        "excerpt"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "description": "引用 source_materials 中的 id 或 RAG 文档 id"
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "email",
+            "image",
+            "supplementary_doc",
+            "rag_public",
+            "rag_private"
+          ],
+          "description": "证据来源类型：rag_public=公共行业知识库, rag_private=企业私有库"
+        },
+        "source_name": {
+          "type": "string",
+          "description": "人类可读的来源名称，如 'COA检测报告_批次20260715.pdf 第3页'"
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "证据原文摘录"
+        },
+        "page_or_location": {
+          "type": "string",
+          "description": "证据在原文中的精确位置"
+        },
+        "relevance": {
+          "type": "string",
+          "description": "为什么这条证据支持当前推论"
+        },
+        "similarity_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "仅当 source_type 为 rag_public 或 rag_private 时有值。RAG 检索相似度分数，如 0.89 表示匹配度 89%，用于前端渲染可信度指示器"
+        }
+      }
+    },
+    "WhyChainStep": {
+      "type": "object",
+      "required": [
+        "level",
+        "question",
+        "answer",
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "5-Why 层级，从 1 开始"
+        },
+        "question": {
+          "type": "string",
+          "description": "这一层问的问题，如 '为什么纸箱会塌？'"
+        },
+        "answer": {
+          "type": "string",
+          "description": "这一层的答案"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "inferred",
+            "speculative"
+          ],
+          "description": "confirmed=有直接证据 | inferred=多证据组合推理 | speculative=无证据纯推测"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          },
+          "minItems": 1,
+          "description": "支持此推论的证据列表，至少一条"
+        },
+        "supplementary_request": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "当 confidence=speculative 时，自动生成的补充资料请求清单"
+        },
+        "cannot_conclude": {
+          "type": "boolean",
+          "description": "confidence=speculative 时为 true，表示此层不具备作为结论的条件"
+        }
+      }
+    },
+    "WhyChainAnalysis": {
+      "type": "object",
+      "required": [
+        "summary",
+        "why_chain"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "该维度根因的一句话总结"
+        },
+        "why_chain": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WhyChainStep"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "RAGSourceReference": {
+      "type": "object",
+      "required": [
+        "doc_id",
+        "doc_name"
+      ],
+      "properties": {
+        "doc_id": {
+          "type": "string"
+        },
+        "doc_name": {
+          "type": "string",
+          "description": "人类可读的文档名称"
+        },
+        "similarity_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "检索相似度分数"
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "检索到的相关段落摘录"
+        }
+      }
+    },
+    "ContributingFactor": {
+      "type": "object",
+      "required": [
+        "factor",
+        "confidence"
+      ],
+      "properties": {
+        "factor": {
+          "type": "string",
+          "description": "次要/辅助原因描述"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "inferred",
+            "speculative"
+          ]
+        }
+      }
+    },
+    "ExcludedCause": {
+      "type": "object",
+      "required": [
+        "cause",
+        "exclusion_reason"
+      ],
+      "properties": {
+        "cause": {
+          "type": "string",
+          "description": "被排除的可能原因"
+        },
+        "exclusion_reason": {
+          "type": "string",
+          "description": "排除理由"
+        },
+        "exclusion_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ConfirmationMeta": {
+      "type": "object",
+      "properties": {
+        "is_confirmed": {
+          "type": "boolean",
+          "description": "该模块是否已被人工确认"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "确认人 user_id，未确认时为 null"
+        },
+        "confirmed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "确认时间 ISO8601，未确认时为 null"
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "最后编辑人 user_id"
+        },
+        "last_edited_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "最后编辑时间 ISO8601"
+        }
+      }
+    },
+    "TeamStructure": {
+      "type": "object",
+      "required": [
+        "team_leader",
+        "members",
+        "departments_involved"
+      ],
+      "properties": {
+        "team_leader": {
+          "type": "string",
+          "description": "组长姓名/工号"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "团队成员列表"
+        },
+        "departments_involved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "涉及部门"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "组队理由（AI 生成时填充）"
+        }
+      }
+    },
+    "ContainmentAction": {
+      "type": "object",
+      "required": [
+        "action",
+        "owner",
+        "deadline"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "具体围堵措施描述"
+        },
+        "owner": {
+          "type": "string",
+          "description": "负责人"
+        },
+        "deadline": {
+          "type": "string",
+          "description": "完成期限"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "为什么要采取此措施"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "证据引用 ID 列表"
+        }
+      }
+    },
+    "AffectedScope": {
+      "type": "object",
+      "properties": {
+        "batches_on_hold": {
+          "type": "string",
+          "description": "需要冻结/隔离的批次"
+        },
+        "inventory_check_required": {
+          "type": "boolean",
+          "description": "是否需要库存排查"
+        },
+        "customer_notification_required": {
+          "type": "boolean",
+          "description": "是否需要通知客户"
+        }
+      }
+    },
+    "CorrectiveAction": {
+      "type": "object",
+      "required": [
+        "action",
+        "target_root_cause",
+        "owner",
+        "deadline"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "具体纠正/永久措施描述"
+        },
+        "target_root_cause": {
+          "type": "string",
+          "description": "此措施针对的是 occurrence_cause 还是 escape_cause 中的哪条根因"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "deadline": {
+          "type": "string"
+        },
+        "verification_method": {
+          "type": "string",
+          "description": "如何验证此措施有效"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "选择此措施的理由"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "VerificationRecord": {
+      "type": "object",
+      "required": [
+        "corrective_action_ref",
+        "verification_method",
+        "verification_criteria",
+        "status"
+      ],
+      "properties": {
+        "corrective_action_ref": {
+          "type": "string",
+          "description": "对应 D5 中的哪条措施（用措施的 action 文本或索引匹配）"
+        },
+        "verification_method": {
+          "type": "string",
+          "description": "验证方法"
+        },
+        "verification_criteria": {
+          "type": "string",
+          "description": "通过的判定标准"
+        },
+        "actual_result": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "实际验证结果，AI 预填时留空，由人工填写"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ],
+          "description": "验证状态"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "PreventiveAction": {
+      "type": "object",
+      "required": [
+        "action",
+        "scope",
+        "owner",
+        "deadline"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "具体预防措施描述"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "流程改进",
+            "标准更新",
+            "培训",
+            "系统防呆",
+            "供应商管理",
+            "检测加严",
+            "其他"
+          ],
+          "description": "预防措施的类别"
+        },
+        "target_system": {
+          "type": "string",
+          "description": "影响的体系/流程名称"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "deadline": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "此措施如何系统性防止再发"
+        },
+        "effectiveness_metric": {
+          "type": "string",
+          "description": "用什么指标衡量防再发效果"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "RecognitionStructure": {
+      "type": "object",
+      "required": [
+        "summary",
+        "key_learnings",
+        "closure_status"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "整个 8D 过程的一句话总结"
+        },
+        "key_learnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "关键经验教训列表"
+        },
+        "team_contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "member",
+              "contribution"
+            ],
+            "properties": {
+              "member": {
+                "type": "string"
+              },
+              "contribution": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "团队成员贡献记录"
+        },
+        "closure_status": {
+          "type": "string",
+          "enum": [
+            "可结案",
+            "需持续监控",
+            "建议升级"
+          ],
+          "description": "结案判定"
+        }
+      }
+    },
+    "AuditEntry": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "user_id",
+        "action",
+        "target_field"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "step_confirmed",
+            "field_edited",
+            "ai_regenerated",
+            "report_exported",
+            "material_uploaded",
+            "responsibility_changed"
+          ]
+        },
+        "target_field": {
+          "type": "string",
+          "description": "修改的字段路径，如 D4.ai_analysis.occurrence_cause.summary"
+        },
+        "old_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "new_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "report_id",
+        "tenant_id",
+        "status",
+        "current_step",
+        "created_at",
+        "created_by"
+      ],
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "系统生成 UUID"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "租户/公司标识"
+        },
+        "workspace_name": {
+          "type": "string",
+          "description": "显示用名称"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "in_progress",
+            "pending_review",
+            "confirmed",
+            "archived"
+          ],
+          "description": "报告整体生命周期状态"
+        },
+        "current_step": {
+          "type": "string",
+          "enum": [
+            "step1_analysis",
+            "step2_root_cause",
+            "step3_responsibility",
+            "step4_rendering"
+          ],
+          "description": "当前所处的分步确认阶段"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "创建人 user_id"
+        },
+        "step_confirmations": {
+          "type": "object",
+          "properties": {
+            "step1": {
+              "type": "object",
+              "properties": {
+                "confirmed_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "confirmed_at": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "step2": {
+              "type": "object",
+              "properties": {
+                "confirmed_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "confirmed_at": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "step3": {
+              "type": "object",
+              "properties": {
+                "confirmed_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "confirmed_at": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "step4": {
+              "type": "object",
+              "properties": {
+                "confirmed_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "confirmed_at": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "source_materials": {
+      "type": "object",
+      "description": "所有上传的原始资料索引",
+      "properties": {
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file_name",
+              "from",
+              "to",
+              "date",
+              "subject",
+              "body_text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file_name": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string",
+                "description": "发件人"
+              },
+              "to": {
+                "type": "string",
+                "description": "收件人"
+              },
+              "date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "body_text": {
+                "type": "string",
+                "description": "提取后的纯文本正文"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "附件文件 ID 引用列表"
+              }
+            }
+          }
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file_name",
+              "uploaded_at",
+              "vision_analysis"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file_name": {
+                "type": "string"
+              },
+              "uploaded_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "vision_analysis": {
+                "type": "object",
+                "required": [
+                  "defect_detected",
+                  "severity",
+                  "raw_description"
+                ],
+                "properties": {
+                  "defect_detected": {
+                    "type": "boolean"
+                  },
+                  "defect_type": {
+                    "type": "string",
+                    "enum": [
+                      "破损",
+                      "划痕",
+                      "塌箱",
+                      "变形",
+                      "印刷缺陷",
+                      "受潮",
+                      "其他"
+                    ],
+                    "description": "Vision LLM 识别出的缺陷类型"
+                  },
+                  "defect_location": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "minor",
+                      "moderate",
+                      "major",
+                      "critical"
+                    ]
+                  },
+                  "raw_description": {
+                    "type": "string",
+                    "description": "Vision LLM 原始分析输出全文"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "supplementary_docs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file_name",
+              "doc_type",
+              "uploaded_at"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file_name": {
+                "type": "string"
+              },
+              "doc_type": {
+                "type": "string",
+                "enum": [
+                  "coa_report",
+                  "inspection_report",
+                  "logistics_record",
+                  "spec_sheet",
+                  "sop",
+                  "other"
+                ]
+              },
+              "uploaded_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "extracted_text": {
+                "type": "string",
+                "description": "关键段落提取文本"
+              }
+            }
+          }
+        }
+      }
+    },
+    "D1_team": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D1 — 组建问题解决团队",
+      "properties": {
+        "ai_draft": {
+          "$ref": "#/definitions/TeamStructure"
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/TeamStructure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "人工确认/修改后的终版，未确认时为 null"
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D2_problem_description": {
+      "type": "object",
+      "required": [
+        "ai_5w2h",
+        "supplementary_checklist",
+        "is_confirmed"
+      ],
+      "description": "D2 — 问题描述 (5W2H) 与影响范围",
+      "properties": {
+        "ai_5w2h": {
+          "type": "object",
+          "required": [
+            "what",
+            "who",
+            "when",
+            "where",
+            "how",
+            "how_much"
+          ],
+          "properties": {
+            "what": {
+              "type": "object",
+              "required": [
+                "defect_name",
+                "defect_category",
+                "detailed_description"
+              ],
+              "properties": {
+                "defect_name": {
+                  "type": "string"
+                },
+                "defect_category": {
+                  "type": "string"
+                },
+                "detailed_description": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "who": {
+              "type": "object",
+              "required": [
+                "reporter",
+                "customer_company"
+              ],
+              "properties": {
+                "reporter": {
+                  "type": "string",
+                  "description": "投诉人/客户方联系人"
+                },
+                "customer_company": {
+                  "type": "string"
+                },
+                "affected_department": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "required": [
+                "complaint_date"
+              ],
+              "properties": {
+                "complaint_date": {
+                  "type": "string"
+                },
+                "problem_discovery_date": {
+                  "type": "string"
+                },
+                "production_date_or_batch": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "where": {
+              "type": "object",
+              "required": [
+                "discovery_location"
+              ],
+              "properties": {
+                "discovery_location": {
+                  "type": "string"
+                },
+                "production_location": {
+                  "type": "string",
+                  "description": "推测的生产地"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "why_initial": {
+              "type": "object",
+              "properties": {
+                "preliminary_hypothesis": {
+                  "type": "string",
+                  "description": "AI 初步推测"
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": [
+                    "confirmed",
+                    "inferred",
+                    "speculative"
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "how": {
+              "type": "object",
+              "required": [
+                "detection_method",
+                "quantity_affected"
+              ],
+              "properties": {
+                "detection_method": {
+                  "type": "string",
+                  "description": "如何发现的"
+                },
+                "quantity_affected": {
+                  "type": "string",
+                  "description": "受影响数量"
+                },
+                "defect_rate": {
+                  "type": "string",
+                  "description": "不良率"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            },
+            "how_much": {
+              "type": "object",
+              "required": [
+                "severity_level"
+              ],
+              "properties": {
+                "estimated_impact": {
+                  "type": "string",
+                  "description": "预估影响金额/范围"
+                },
+                "severity_level": {
+                  "type": "string",
+                  "enum": [
+                    "minor",
+                    "moderate",
+                    "major",
+                    "critical"
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Evidence"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "supplementary_checklist": {
+          "type": "array",
+          "description": "Step 1 结束后 AI 输出的补充资料清单",
+          "items": {
+            "type": "object",
+            "required": [
+              "item",
+              "reason",
+              "status"
+            ],
+            "properties": {
+              "item": {
+                "type": "string",
+                "description": "需要的资料名称"
+              },
+              "reason": {
+                "type": "string",
+                "description": "为什么需要"
+              },
+              "triggered_by": {
+                "type": "string",
+                "description": "引用哪条 speculative 推论"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "uploaded",
+                  "waived"
+                ]
+              },
+              "uploaded_doc_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "summary_confirmed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Step 1 确认后的终版 5W2H 摘要文本，后续步骤以此为准"
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D3_containment": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D3 — 围堵/临时措施，止血为先",
+      "properties": {
+        "ai_draft": {
+          "type": "object",
+          "required": [
+            "immediate_actions"
+          ],
+          "properties": {
+            "immediate_actions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ContainmentAction"
+              }
+            },
+            "affected_scope": {
+              "$ref": "#/definitions/AffectedScope"
+            }
+          }
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "immediate_actions"
+              ],
+              "properties": {
+                "immediate_actions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ContainmentAction"
+                  }
+                },
+                "affected_scope": {
+                  "$ref": "#/definitions/AffectedScope"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "人工确认/修改后的围堵措施，结构与 ai_draft 完全一致，未确认时为 null"
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D4_root_cause": {
+      "type": "object",
+      "required": [
+        "ai_analysis",
+        "responsibility_judgment",
+        "is_confirmed"
+      ],
+      "description": "D4 — 根本原因分析（双维度：发生根因 + 流出根因），系统核心推理引擎输出",
+      "properties": {
+        "ai_analysis": {
+          "type": "object",
+          "required": [
+            "occurrence_cause",
+            "escape_cause"
+          ],
+          "properties": {
+            "occurrence_cause": {
+              "type": "object",
+              "description": "发生根因：为什么缺陷会产生？",
+              "required": [
+                "summary",
+                "why_chain"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "发生根因的一句话总结，如 '供应商该批次纸板边压强度不达标'"
+                },
+                "why_chain": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/WhyChainStep"
+                  },
+                  "minItems": 1,
+                  "description": "针对'为什么会发生'的 5-Why 推理链"
+                }
+              }
+            },
+            "escape_cause": {
+              "type": "object",
+              "description": "流出根因：为什么缺陷产生后，检验环节没有拦截住？",
+              "required": [
+                "summary",
+                "why_chain"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "description": "流出根因的一句话总结，如 '来料检验未覆盖边压强度项目'"
+                },
+                "why_chain": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/WhyChainStep"
+                  },
+                  "minItems": 1,
+                  "description": "针对'为什么没拦截住'的 5-Why 推理链"
+                }
+              }
+            },
+            "contributing_factors": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ContributingFactor"
+              },
+              "description": "次要/辅助原因"
+            },
+            "excluded_causes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ExcludedCause"
+              },
+              "description": "被排除的可能原因及排除理由"
+            },
+            "rag_sources_used": {
+              "type": "object",
+              "properties": {
+                "public_kb_docs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/RAGSourceReference"
+                  },
+                  "description": "引用的公共行业知识库文档"
+                },
+                "private_kb_docs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/RAGSourceReference"
+                  },
+                  "description": "引用的企业私有库文档"
+                }
+              }
+            }
+          }
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "人工确认/修改后的根因分析，结构与 ai_analysis 完全一致",
+              "required": [
+                "occurrence_cause",
+                "escape_cause"
+              ],
+              "properties": {
+                "occurrence_cause": {
+                  "type": "object",
+                  "required": [
+                    "summary",
+                    "why_chain"
+                  ],
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "why_chain": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/WhyChainStep"
+                      },
+                      "minItems": 1
+                    }
+                  }
+                },
+                "escape_cause": {
+                  "type": "object",
+                  "required": [
+                    "summary",
+                    "why_chain"
+                  ],
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "why_chain": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/WhyChainStep"
+                      },
+                      "minItems": 1
+                    }
+                  }
+                },
+                "contributing_factors": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ContributingFactor"
+                  }
+                },
+                "excluded_causes": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ExcludedCause"
+                  }
+                },
+                "rag_sources_used": {
+                  "type": "object",
+                  "properties": {
+                    "public_kb_docs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/RAGSourceReference"
+                      }
+                    },
+                    "private_kb_docs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/RAGSourceReference"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "responsibility_judgment": {
+          "type": "object",
+          "description": "Step 3 责任判定 — AI 建议 + 人工确认",
+          "required": [
+            "ai_suggestion",
+            "confirmed_by_user"
+          ],
+          "properties": {
+            "ai_suggestion": {
+              "type": "object",
+              "required": [
+                "primary_responsibility",
+                "primary_rationale",
+                "alternatives"
+              ],
+              "properties": {
+                "primary_responsibility": {
+                  "type": "string",
+                  "enum": [
+                    "供应商",
+                    "客户方",
+                    "设计缺陷",
+                    "第三方(物流等)",
+                    "多方共担",
+                    "不可抗力"
+                  ],
+                  "description": "AI 建议的主要责任方"
+                },
+                "primary_rationale": {
+                  "type": "string",
+                  "description": "判定理由，需引用证据"
+                },
+                "primary_evidence_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "alternatives": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "party",
+                      "rationale",
+                      "evidence_count",
+                      "why_not_recommended"
+                    ],
+                    "properties": {
+                      "party": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "evidence_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "why_not_recommended": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "AI 列出的备选责任方及其不推荐理由"
+                }
+              }
+            },
+            "confirmed_by_user": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "selected_responsibility"
+                  ],
+                  "properties": {
+                    "selected_responsibility": {
+                      "type": "string"
+                    },
+                    "custom_rationale": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "用户手动输入的理由"
+                    },
+                    "confirmed_by": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "confirmed_at": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "用户确认后的责任判定结果，未确认时为 null"
+            }
+          }
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D5_corrective_actions": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D5 — 纠正/永久措施，针对根因的解决方案",
+      "properties": {
+        "ai_draft": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CorrectiveAction"
+          },
+          "description": "AI 生成的纠正措施列表"
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CorrectiveAction"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "人工确认/修改后的纠正措施列表，类型与 ai_draft 一致"
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D6_verification": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D6 — 措施有效性验证",
+      "properties": {
+        "ai_draft": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/VerificationRecord"
+          }
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/VerificationRecord"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D7_preventive_actions": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D7 — 预防措施，系统防再发",
+      "properties": {
+        "ai_draft": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreventiveAction"
+          }
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PreventiveAction"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "D8_recognition": {
+      "type": "object",
+      "required": [
+        "ai_draft",
+        "is_confirmed"
+      ],
+      "description": "D8 — 项目结案与团队表彰",
+      "properties": {
+        "ai_draft": {
+          "$ref": "#/definitions/RecognitionStructure"
+        },
+        "confirmed": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/RecognitionStructure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "confirmed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmed_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_edited_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_edited_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "audit_log": {
+      "type": "object",
+      "description": "完整操作审计记录，满足 ISO 9001 / IATF 16949 体系审核要求",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AuditEntry"
+          }
+        }
+      }
+    },
+    "export_info": {
+      "type": "object",
+      "description": "报告导出记录",
+      "properties": {
+        "last_exported_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "export_format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "pdf",
+            "docx",
+            null
+          ]
+        },
+        "export_version": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "导出总次数"
+        }
+      }
+    }
+  }
+}

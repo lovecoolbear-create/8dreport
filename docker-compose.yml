@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      # ==========================================
+      # 🚀 AI 模型配置区 (开箱即用)
+      # ==========================================
+      #
+      # 场景 A: 使用本地大模型 (默认指向宿主机的 Ollama)
+      # 在 Windows/Mac Docker 中，host.docker.internal 代表你的实体电脑
+      - OLLAMA_API_BASE=http://host.docker.internal:11434
+      
+      # 场景 B: 使用云端付费大模型 (如 OpenAI, DeepSeek)
+      # 取消下方注释并填入你的 API Key 即可一键切换
+      # - OPENAI_API_KEY=sk-xxxxxxx
+      # - DEEPSEEK_API_KEY=sk-xxxxxxx
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
